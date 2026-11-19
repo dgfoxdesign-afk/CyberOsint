@@ -1,6 +1,6 @@
 {
   "name": "osint-threat-dashboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
-  "description": "Global OSINT & Cyber Threat Intelligence Monitor for Netlify"
+  "description": "Global OSINT & Cyber Threat Intelligence Monitor for Netlify (with URLhaus integration)"
 }

@@ -1,6 +1,7 @@
 export default async (req, context) => {
   const now = Math.floor(Date.now() / 1000);
   const sixHoursAgo = now - 21600;
+  const urlhausKey = process.env.URLHAUS_AUTH_KEY || "";
 
   const sources = {
     cisaKev: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
@@ -11,13 +12,16 @@ export default async (req, context) => {
     gdeltEnergy: "https://api.gdeltproject.org/api/v2/doc/doc?query=(power%20grid%20outage%20OR%20energy%20infrastructure%20attack%20OR%20pipeline%20disruption)&mode=ArtList&maxrecords=8&format=json"
   };
 
-  const fetchJson = async (url) => {
+  const fetchJson = async (url, extraHeaders = {}) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 8000);
     try {
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: { "User-Agent": "OSINT-SOC-Dashboard/1.0" }
+        headers: {
+          "User-Agent": "OSINT-SOC-Dashboard/1.0",
+          ...extraHeaders
+        }
       });
       clearTimeout(id);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -28,13 +32,20 @@ export default async (req, context) => {
     }
   };
 
-  const [kev, victims, outages, c2, geo, energy] = await Promise.all([
+  const urlhausPromise = urlhausKey
+    ? fetchJson("https://urlhaus-api.abuse.ch/v1/urls/recent/limit/15/", {
+        "Auth-Key": urlhausKey
+      })
+    : Promise.resolve({ urls: [] });
+
+  const [kev, victims, outages, c2, geo, energy, urlhausData] = await Promise.all([
     fetchJson(sources.cisaKev),
     fetchJson(sources.ransomwareVictims),
     fetchJson(sources.iodaOutages),
     fetchJson(sources.feodoC2),
     fetchJson(sources.gdeltGeo),
-    fetchJson(sources.gdeltEnergy)
+    fetchJson(sources.gdeltEnergy),
+    urlhausPromise
   ]);
 
   const recentKev = Array.isArray(kev?.vulnerabilities)
@@ -57,6 +68,18 @@ export default async (req, context) => {
 
   const activeC2 = Array.isArray(c2) ? c2.slice(0, 12) : [];
 
+  const recentMalwareUrls = Array.isArray(urlhausData?.urls)
+    ? urlhausData.urls.slice(0, 10).map(u => ({
+        url: u.url,
+        host: u.host,
+        status: u.url_status,
+        threat: u.threat,
+        dateAdded: u.date_added,
+        reference: u.urlhaus_reference,
+        tags: Array.isArray(u.tags) ? u.tags.slice(0, 3) : []
+      }))
+    : [];
+
   const payload = {
     timestamp: new Date().toISOString(),
     cve: recentKev,
@@ -68,7 +91,8 @@ export default async (req, context) => {
     outages: activeOutages,
     c2: activeC2,
     geopolitics: geo?.articles || [],
-    energy: energy?.articles || []
+    energy: energy?.articles || [],
+    urlhaus: recentMalwareUrls
   };
 
   return new Response(JSON.stringify(payload), {

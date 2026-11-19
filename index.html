@@ -127,6 +127,14 @@
 
   <div class="panel">
     <div class="panel-header">
+      <h2>🦠 URL Distribuzione Malware</h2>
+      <span class="tag crit">URLHAUS</span>
+    </div>
+    <div class="scroll-area" id="urlhaus-list">Caricamento...</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
       <h2>🤖 Server C2 & Botnet Attive</h2>
       <span class="tag crit">ABUSE.CH FEODO</span>
     </div>
@@ -208,6 +216,19 @@
           </div>
         </div>
       `).join('') : '<div class="item">Nessun dato CVE disponibile.</div>';
+
+      const uhEl = document.getElementById('urlhaus-list');
+      uhEl.innerHTML = data.urlhaus?.length ? data.urlhaus.map(u => `
+        <div class="item">
+          <div class="item-title mono"><a href="${u.reference}" target="_blank" rel="noopener">${u.host || u.url}</a></div>
+          <div style="font-size:11px;word-break:break-all;margin-bottom:3px;color:#d1d5db;">${u.url}</div>
+          <div class="item-meta">
+            <span>Stato: <strong style="color:${u.status === 'online' ? '#ef4444' : '#9ca3af'}">${u.status || 'N/A'}</strong></span>
+            <span>Minaccia: ${u.threat || 'malware_download'}</span>
+            ${u.tags.length ? `<span>Tag: ${u.tags.join(', ')}</span>` : ''}
+          </div>
+        </div>
+      `).join('') : '<div class="item">Configura URLHAUS_AUTH_KEY su Netlify per visualizzare i feed.</div>';
 
       const c2El = document.getElementById('c2-list');
       c2El.innerHTML = data.c2.length ? data.c2.map(bot => `
